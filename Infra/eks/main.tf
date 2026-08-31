@@ -34,7 +34,7 @@ module "eks" {
       # Starting on 1.30, AL2023 is the default AMI type for EKS managed node groups
       ami_type       = "AL2023_x86_64_STANDARD"
       # ami_type       = "AL2023_ARM_64_STANDARD"
-      instance_types = ["t3.large"]
+      instance_types = ["t3a.large"]
       capacity_type  = "SPOT"
       min_size     = 1
       max_size     = 1
@@ -44,5 +44,16 @@ module "eks" {
      }
     }
   }
+  
   create_cloudwatch_log_group = false
+}
+
+resource "aws_security_group_rule" "allow_istio_ingress" {
+  type              = "ingress"
+  from_port         = 15017
+  to_port           = 15017
+  protocol          = "tcp"
+  security_group_id = module.eks.node_security_group_id
+  source_security_group_id = module.eks.cluster_security_group_id
+  description       = "Allow Cluster API inbound to the node for istio webhook"
 }

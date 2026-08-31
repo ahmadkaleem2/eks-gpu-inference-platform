@@ -1,6 +1,9 @@
 resource kubernetes_namespace_v1 "namespace" {
     metadata {
         name = local.namespace
+        labels = {
+            istio-injection = "enabled"
+        }
     }
 }
 
@@ -123,6 +126,7 @@ module "s3_bucket" {
   block_public_policy = true
   ignore_public_acls = false
   restrict_public_buckets = true
+
 }
 
 data "aws_partition" "current" {}
@@ -184,9 +188,12 @@ module "sqs" {
 resource "aws_s3_bucket_notification" "this" {
   bucket = module.s3_bucket.s3_bucket_id
 
+
   queue {
     queue_arn = module.sqs.queue_arn
     events    = ["s3:ObjectCreated:*"]
+    filter_prefix = "images/"
+    filter_suffix = ".jpg"
   }
 
   depends_on = [
@@ -201,7 +208,7 @@ resource "kubernetes_deployment_v1" "inference_worker" {
     }
     
     spec {
-        replicas = 1
+        replicas = 0
     
         strategy {
           rolling_update {
@@ -226,6 +233,8 @@ resource "kubernetes_deployment_v1" "inference_worker" {
             }
     
             spec {
+
+
                 service_account_name = kubernetes_service_account_v1.inference_worker.metadata[0].name
                 
                 # affinity {
@@ -242,11 +251,16 @@ resource "kubernetes_deployment_v1" "inference_worker" {
                 #     }
                 # }
 
+                toleration {
+                    key      = "nvidia.com/gpu"
+                    operator = "Exists"
+                    effect   = "NoSchedule"
+                }
 
                 container {
 
                     name  = local.inference_worker_base_k8s_name
-                    image = "680688655542.dkr.ecr.us-east-1.amazonaws.com/ahmad/eks-gpu-inference-platform:inference-worker-bf4b58d"
+                    image = "680688655542.dkr.ecr.us-east-1.amazonaws.com/ahmad/eks-gpu-inference-platform:inference-worker-accf108"
 
                     resources {
                         limits = {
@@ -284,4 +298,64 @@ resource "kubernetes_service_account_v1" "inference_worker" {
             "eks.amazonaws.com/role-arn" = aws_iam_role.inference_worker_service_account_role.arn
         }
     }
+}
+
+resource "kubernetes_manifest" "inference_worker_scaled_object" {
+  manifest = {
+    apiVersion = "keda.sh/v1alpha1"
+    kind       = "ScaledObject"
+
+    metadata = {
+      name      = local.inference_worker_base_k8s_name
+      namespace = local.namespace
+    }
+
+    spec = {
+      scaleTargetRef = {
+        name = local.inference_worker_base_k8s_name
+      }
+
+      minReplicaCount = 0
+      maxReplicaCount = 4
+
+      pollingInterval = 60
+      cooldownPeriod  = 180
+
+      triggers = [
+        {
+          type = "aws-sqs-queue"
+
+          authenticationRef = {
+            name = "aws-sqs-auth"
+          }
+
+          metadata = {
+            queueURL    = module.sqs.queue_url
+            awsRegion   = "us-east-1"
+            queueLength = "50"
+          }
+        }
+      ]
+    }
+  }
+}
+
+resource "kubernetes_manifest" "keda_trigger_authentication" {
+  manifest = {
+    apiVersion = "keda.sh/v1alpha1"
+    kind       = "TriggerAuthentication"
+
+    metadata = {
+      name      = "aws-sqs-auth"
+      namespace = local.namespace
+    }
+
+    spec = {
+      podIdentity = {
+        provider = "aws"
+        roleArn  = "arn:aws:iam::680688655542:role/keda-role-Ahmad-EKS"
+        identityOwner= "keda"
+      }
+    }
+  }
 }

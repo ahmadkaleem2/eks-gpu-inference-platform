@@ -26,7 +26,7 @@ variable "cluster_oidc_issuer_url" {
 variable "service_account_name" {
     type        = string
     description = "The name of the service account for the ALBC."
-    default     = "keda"
+    default     = "keda-operator"
 }
 
 variable "eks_cluster_name" {

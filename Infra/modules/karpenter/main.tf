@@ -25,6 +25,12 @@ resource "kubernetes_manifest" "gpu_node_pool" {
     spec = {
       template = {
         spec = {
+          taints = [
+            {
+              key    = "nvidia.com/gpu"
+              effect = "NoSchedule"
+            }
+          ]
           requirements = [
             {
               key      = "kubernetes.io/arch"
@@ -39,7 +45,7 @@ resource "kubernetes_manifest" "gpu_node_pool" {
             {
               key      = "karpenter.sh/capacity-type"
               operator = "In"
-              values   = ["spot", "on-demand"]
+              values   = ["spot"]
             },
             {
               key      = "node.kubernetes.io/instance-type"

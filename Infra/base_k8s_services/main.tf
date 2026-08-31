@@ -10,6 +10,7 @@ module "keda" {
     values = {}
     cluster_oidc_issuer_url = local.cluster_oidc_issuer_url
     eks_cluster_name = data.terraform_remote_state.eks.outputs.cluster_name
+    depends_on = [module.albc]
 }
 
 module "karpenter" {

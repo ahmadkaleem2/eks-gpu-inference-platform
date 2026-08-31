@@ -15,7 +15,7 @@ resource "aws_iam_role" "this" {
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
           StringEquals = {
-            "${var.cluster_oidc_issuer_url}:sub" = "system:serviceaccount:kube-system:${var.service_account_name}",
+            "${var.cluster_oidc_issuer_url}:sub" = "system:serviceaccount:${var.namespace}:${var.service_account_name}",
 
           }
         }

@@ -21,16 +21,10 @@ create_infra() {
 
   aws eks update-kubeconfig --region us-east-1 --name Ahmad-EKS
 
-  # cd ../add_ons
-  # terraform init
-  # terraform apply -auto-approve
-
   cd ../base_k8s_services
   terraform init
   terraform apply -auto-approve -target='module.karpenter.helm_release.this'
   terraform apply -auto-approve
-
-  # aws eks update-kubeconfig --region us-east-1 --name Ahmad-EKS
 
   # argocd_initial_password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o=jsonpath='{.data.password}' | base64 -d)
   # echo "ArgoCD initial admin password: $argocd_initial_password"
@@ -59,7 +53,7 @@ destroy_infra() {
 
   cd ../networking
   terraform destroy -auto-approve
-
+≠
   echo "Infrastructure destroyed."
 }
 

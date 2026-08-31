@@ -7,6 +7,7 @@ resource "aws_iam_policy" "upload_api_policy" {
       {
         Action = [
           "s3:PutObject",
+          "s3:GetBucketLocation"
         ]
         Effect   = "Allow"
         Resource = [module.s3_bucket.s3_bucket_arn, "${module.s3_bucket.s3_bucket_arn}/*"]
@@ -53,6 +54,7 @@ resource "aws_iam_policy" "inference_worker_policy" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
+          "s3:GetBucketLocation"
         ]
         Effect   = "Allow"
         Resource = [module.s3_bucket.s3_bucket_arn, "${module.s3_bucket.s3_bucket_arn}/*"]
