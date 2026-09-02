@@ -45,7 +45,7 @@ resource "kubernetes_manifest" "gpu_node_pool" {
             {
               key      = "karpenter.sh/capacity-type"
               operator = "In"
-              values   = ["spot"]
+              values   = ["spot", "on-demand"]
             },
             {
               key      = "node.kubernetes.io/instance-type"
@@ -59,13 +59,7 @@ resource "kubernetes_manifest" "gpu_node_pool" {
             kind  = "EC2NodeClass"
             name  = "gpu"
           }
-          # taints = [
-          #   {
-          #     key      = "nvidia.com/gpu"
-          #     operator = "Exists"
 
-          #   }
-          # ]
 
           expireAfter = "720h"
         }
