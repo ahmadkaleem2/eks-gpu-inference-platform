@@ -27,8 +27,3 @@ variable "karpenter_version" {
   type    = string
   default = "1.9.0"
 }
-
-variable "node_iam_role_name" {
-  type        = string
-  description = "The name of the IAM role for the Karpenter nodes."
-}

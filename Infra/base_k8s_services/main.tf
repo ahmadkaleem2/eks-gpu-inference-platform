@@ -18,7 +18,6 @@ module "karpenter" {
   values                  = {}
   cluster_oidc_issuer_url = local.cluster_oidc_issuer_url
   eks_cluster_name        = data.terraform_remote_state.eks.outputs.cluster_name
-  node_iam_role_name      = data.terraform_remote_state.eks.outputs.eks_managed_node_groups_iam_role_name
   depends_on              = [module.albc]
 
 }

@@ -1,5 +1,15 @@
 # EKS GPU Inference Platform
 
+![Terraform](https://img.shields.io/badge/Terraform-844FBA?style=flat-square&logo=terraform&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-FF9900?style=flat-square&logo=amazonaws&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-326CE5?style=flat-square&logo=kubernetes&logoColor=white)
+![Istio](https://img.shields.io/badge/Istio-466BB0?style=flat-square&logo=istio&logoColor=white)
+![Karpenter](https://img.shields.io/badge/Karpenter-FF9900?style=flat-square)
+![KEDA](https://img.shields.io/badge/KEDA-3090C7?style=flat-square)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+
 A production-shaped Kubernetes platform on AWS EKS that runs GPU inference workloads and **scales the GPU fleet to zero when idle**.
 
 Images are uploaded through an authenticated API, land in S3, trigger an SQS event, and KEDA scales a pool of YOLO inference workers based on queue depth. Karpenter provisions `g4dn` spot nodes on demand and removes them once the queue drains — so the expensive hardware only exists while there is work for it.
@@ -115,8 +125,7 @@ Infra/
     albc/              AWS Load Balancer Controller + IRSA
     karpenter/         Karpenter + IRSA + instance profile
     keda/              KEDA + IRSA
-    istio/             istio-base, istiod, ingress gateway, ACM lookup
-    external-dns/      Route 53 record management (unused -- DNS is wired directly in modules/istio instead)
+    istio/             istio-base, istiod, ingress gateway, ACM lookup, Route 53 record
     k8s-gpu-plugin/    NVIDIA device plugin
     fluent-bit/        CloudWatch log shipping
     eks_access_entry/  EKS access entries for IAM principals
@@ -127,7 +136,10 @@ apps/
   upload-api/          FastAPI upload service
   inference-worker/    YOLO batch inference worker
 
-.github/workflows/     Build + push to ECR, deploy via OIDC
+.github/workflows/     upload-api: build, Trivy-scan, push to ECR, deploy via OIDC
+                       inference-worker: build, push to ECR, deploy via OIDC (not
+                       internet-facing, so not scanned)
+                       Terraform fmt/validate on Infra/ changes
 ```
 
 Each layer keeps its own state in S3 and consumes the layer below it through `terraform_remote_state` outputs.
@@ -206,7 +218,6 @@ Problems worth recording, because the fixes are not obvious:
 
 ## Roadmap
 
-- [ ] **Split `app` into data and workload layers** so the state boundary matches the lifetime boundary (S3/SQS/Cognito survive cluster rebuilds; Deployments do not).
 - [ ] **Parameterise the root layers** — cluster name, region, domain and account are currently hardcoded. No dev/prod separation yet.
-- [ ] **Observability** — re-enable the Fluent Bit module, add Prometheus and Grafana.
+- [ ] **Observability** — add Prometheus and Grafana; Fluent Bit already ships container logs to CloudWatch.
 - [ ] **AMI alias instead of a pinned AMI ID** in the GPU `EC2NodeClass`, so node images pick up patches.

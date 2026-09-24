@@ -11,6 +11,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  security-events: write
 
 env:
   ECR_REPOSITORY: ahmad/eks-gpu-inference-platform
@@ -21,6 +22,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      security-events: write
     outputs:
       image: ${{ steps.image.outputs.image }}
     steps:
@@ -42,13 +44,31 @@ jobs:
         id: tag
         run: echo "tag=upload-api-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push Docker image
+      - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
           context: ./apps/upload-api
-          push: true
+          push: false
+          load: true
           tags: |
             ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "0" # report-only -- flip to "1" to block the build on findings
+
+      - name: Upload Trivy results to code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Push Docker image
+        run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}
 
       - name: Set image output
         id: image
