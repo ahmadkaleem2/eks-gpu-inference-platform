@@ -80,10 +80,11 @@ resource "kubernetes_manifest" "gpu_ec2_node_class" {
     spec = {
       amiFamily = "AL2023"
 
-      # Pinned by ID rather than an alias because the GPU nodes need the
-      # NVIDIA-enabled AL2023 variant. Revisit switching to
-      # `alias = "al2023@latest"` once verified that Karpenter selects the
-      # NVIDIA AMI for GPU instance types -- a pinned ID gets no patches.
+      # Pinned by ID rather than an alias, deliberately: `alias = "al2023@latest"`
+      # would let an unreviewed AMI start running GPU workloads the moment AWS
+      # publishes it. Doing that safely needs a dev/staging environment to land
+      # a new AMI in first -- this project has no such environment, so bumping
+      # the pinned ID by hand, on purpose, is the right tradeoff here.
       amiSelectorTerms = [
         {
           id = "ami-0ec20d5fad1326c34" # x86

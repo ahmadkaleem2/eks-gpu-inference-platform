@@ -12,4 +12,5 @@ resource "helm_release" "this" {
     value = v
   }]
   timeout = 600
+  depends_on = [ aws_iam_role.this, aws_iam_role_policy_attachment.this, aws_iam_policy.this ]
 }

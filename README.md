@@ -218,6 +218,4 @@ Problems worth recording, because the fixes are not obvious:
 
 ## Roadmap
 
-- [ ] **Parameterise the root layers** — cluster name, region, domain and account are currently hardcoded. No dev/prod separation yet.
 - [ ] **Observability** — add Prometheus and Grafana; Fluent Bit already ships container logs to CloudWatch.
-- [ ] **AMI alias instead of a pinned AMI ID** in the GPU `EC2NodeClass`, so node images pick up patches.
