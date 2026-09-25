@@ -27,7 +27,7 @@ flowchart TB
     end
 
     subgraph aws["AWS"]
-        R53["Route 53<br/>ahmadk.link"]
+        R53["Route 53"]
         ACM["ACM Certificate"]
         COG["Cognito User Pool"]
         ECR[("ECR")]
@@ -36,13 +36,15 @@ flowchart TB
             NLB["Istio Ingress Gateway<br/>AWS Load Balancer Controller"]
 
             subgraph eks["EKS · Kubernetes 1.36"]
-                subgraph sys["System node group · t3a.large spot"]
+                subgraph sys["System node group · t3a.xlarge spot"]
                     API["upload-api<br/>FastAPI"]
                     KEDA["KEDA"]
                     KARP["Karpenter"]
+                    FB["Fluent Bit"]
                 end
 
                 subgraph gpu["Karpenter GPU NodePool · g4dn.xlarge spot · scales to zero"]
+                    GPUPLUG["NVIDIA Device Plugin"]
                     W1["inference-worker<br/>YOLO + CUDA"]
                 end
             end
@@ -50,6 +52,7 @@ flowchart TB
 
         S3[("S3<br/>images/ · results/ · model")]
         SQS["SQS Queue<br/>+ DLQ"]
+        CW[("CloudWatch Logs")]
     end
 
     U -->|HTTPS + JWT| R53 --> NLB
@@ -61,10 +64,12 @@ flowchart TB
     SQS -.queue depth.-> KEDA
     KEDA -->|scale 0..20| W1
     KARP -.provisions GPU nodes.-> gpu
+    GPUPLUG -.advertises GPU resource.-> W1
     W1 -->|poll + batch| SQS
     W1 -->|read image, write detections| S3
     ECR -.images.-> API
     ECR -.images.-> W1
+    FB -.ship logs.-> CW
 ```
 
 ### Request flow
@@ -108,7 +113,7 @@ This platform runs the same workload for the time the queue is actually non-empt
 | Capacity type | on-demand | spot (~60-70% discount) |
 | Idle cost | full | **$0** |
 
-The permanently-running footprint is one `t3a.large` spot node for the system components plus a single NAT gateway. Everything GPU-shaped is created on demand and consolidated away within a minute of going idle.
+The permanently-running footprint is one `t3a.xlarge` spot node for the system components plus a single NAT gateway. Everything GPU-shaped is created on demand and consolidated away within a minute of going idle.
 
 ---
 
@@ -213,6 +218,8 @@ Problems worth recording, because the fixes are not obvious:
 **KEDA scaling from zero needs two thresholds.** `queueLength` alone will not do it — `activationQueueLength` is the separate threshold that governs the 0→1 transition. Set to 50 so a handful of stray messages doesn't wake a GPU node, with `queueLength: 80` driving replica count after that.
 
 **Rolling updates on a scale-to-zero deployment.** `maxUnavailable: 100% / maxSurge: 0` on the worker: surging is pointless when replicas are frequently zero, and it avoids requesting a second GPU node just to roll a deployment.
+
+**Fluent Bit silently missing GPU node logs.** The `aws-for-fluent-bit` chart's default tolerations are empty, so the daemonset never scheduled onto the GPU NodePool's tainted (`nvidia.com/gpu:NoSchedule`) nodes — no error, no warning, `inference-worker`'s logs just never showed up in CloudWatch. Fixed by adding a matching toleration to the Fluent Bit Helm values.
 
 ---
 
