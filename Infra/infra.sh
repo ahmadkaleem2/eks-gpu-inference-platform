@@ -46,7 +46,11 @@ destroy_infra() {
   # recreating it is not reliably repeatable.
   # To destroy it for real:  cd app && terraform destroy
 
-  cd platform_config
+  cd app
+  terraform init
+  terraform destroy -auto-approve -target=kubernetes_manifest.keda_trigger_authentication -target=kubernetes_manifest.inference_worker_scaled_object
+  
+  cd ../platform_config
   terraform init
   terraform destroy -auto-approve
 

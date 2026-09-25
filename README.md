@@ -201,7 +201,7 @@ Teardown:
 ./infra.sh destroy
 ```
 
-> `destroy` deliberately leaves the `app` layer in place. S3 bucket names are globally unique and slow to recycle, and the bucket holds the model and results — so the data plane survives cluster rebuilds. Destroy it explicitly with `cd app && terraform destroy` when you really mean it.
+> `destroy` deliberately leaves the `app` layer's data plane in place. S3 bucket names are globally unique and slow to recycle, and the bucket holds the model and results — so it survives cluster rebuilds. The one exception is KEDA's `ScaledObject`/`TriggerAuthentication` custom resources, which get destroyed first (see Engineering notes below) — everything else in `app` stays. Destroy the rest of it explicitly with `cd app && terraform destroy` when you really mean it.
 
 ---
 
@@ -214,6 +214,8 @@ Problems worth recording, because the fixes are not obvious:
 **Istio sidecar injection failing.** The injection webhook is served on port 15017 on the pod, and the EKS module's default node security group does not allow the control plane to reach it. Added an explicit ingress rule from the cluster security group to the node security group on 15017.
 
 **Karpenter CRs and Terraform plan-time ordering.** `kubernetes_manifest` requires the CRD to already be registered *at plan time*, which is impossible on a cluster that does not exist yet. Handled by applying the layers in strict order, so the CRDs are installed by `base_k8s_services` before `platform_config` plans against them.
+
+**Same problem, in reverse, on teardown.** `app`'s `keda_trigger_authentication` and `inference_worker_scaled_object` are also `kubernetes_manifest` resources, so they need KEDA's CRDs to still be registered to be destroyed. `base_k8s_services` -- which installs those CRDs -- tears down right after in `infra.sh destroy`, so those two are destroyed explicitly first, while the CRDs still exist, instead of being left orphaned in `app`'s state once they don't.
 
 **KEDA scaling from zero needs two thresholds.** `queueLength` alone will not do it — `activationQueueLength` is the separate threshold that governs the 0→1 transition. Set to 50 so a handful of stray messages doesn't wake a GPU node, with `queueLength: 80` driving replica count after that.
 
