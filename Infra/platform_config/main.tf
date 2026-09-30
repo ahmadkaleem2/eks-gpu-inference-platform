@@ -209,3 +209,59 @@ resource "kubernetes_manifest" "platform_gateway" {
   }
 }
 
+resource "terraform_data" "argocd_repo_secret" {
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = <<-EOT
+      kubectl -n argocd create secret generic repo-eks-gpu-inference-platform \
+        --from-literal=type=git \
+        --from-literal=url=git@github.com:ahmadkaleem2/eks-gpu-inference-platform.git \
+        --from-file=sshPrivateKey=$HOME/.ssh/argo_rsa \
+        --dry-run=client -o yaml | kubectl apply -f -
+      kubectl -n argocd label secret repo-eks-gpu-inference-platform \
+        argocd.argoproj.io/secret-type=repository --overwrite
+    EOT
+  }
+}
+
+
+
+resource "kubernetes_manifest" "eks_gitops_platform_app" {
+  depends_on = [
+    terraform_data.argocd_repo_secret
+  ]
+  manifest = {
+    apiVersion = "argoproj.io/v1alpha1"
+    kind       = "Application"
+
+    metadata = {
+      name      = "eks-gpu-inference-platform"
+      namespace = "argocd"
+    }
+
+    spec = {
+      project = "default"
+
+      source = {
+        repoURL        = "git@github.com:ahmadkaleem2/eks-gpu-inference-platform.git"
+        targetRevision = "argocd"
+        path           = "gitops"
+      }
+
+      destination = {
+        server    = "https://kubernetes.default.svc"
+        namespace = "argocd"
+      }
+
+      syncPolicy = {
+        automated = {
+          prune    = true
+          selfHeal = true
+        }
+        syncOptions = [
+          "CreateNamespace=true"
+        ]
+      }
+    }
+  }
+}

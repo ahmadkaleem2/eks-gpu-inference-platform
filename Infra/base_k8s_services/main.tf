@@ -22,12 +22,12 @@ module "karpenter" {
 
 }
 
-module "fluent-bit" {
-  source                  = "../modules/fluent-bit"
-  values                  = {}
-  cluster_oidc_issuer_url = local.cluster_oidc_issuer_url
-  eks_cluster_name        = data.terraform_remote_state.eks.outputs.cluster_name
-}
+# module "fluent-bit" {
+#   source                  = "../modules/fluent-bit"
+#   values                  = {}
+#   cluster_oidc_issuer_url = local.cluster_oidc_issuer_url
+#   eks_cluster_name        = data.terraform_remote_state.eks.outputs.cluster_name
+# }
 
 module "istio" {
   source = "../modules/istio"
@@ -42,17 +42,25 @@ module "istio" {
 
 }
 
-module "k8s-gpu-plugin" {
-  source = "../modules/k8s-gpu-plugin"
+# module "k8s-gpu-plugin" {
+#   source = "../modules/k8s-gpu-plugin"
 
-  depends_on = [
-    module.karpenter
-  ]
-}
+#   depends_on = [
+#     module.karpenter
+#   ]
+# }
 
 module "github_actions_access" {
   source = "../modules/eks_access_entry"
 
   role_name        = "ahmad-github-oidc-role"
   eks_cluster_name = data.terraform_remote_state.eks.outputs.cluster_name
+}
+
+module "argocd" {
+  source = "../modules/argocd"
+}
+
+module "kube_prom_stack" {
+  source = "../modules/kube_prom_stack"
 }
