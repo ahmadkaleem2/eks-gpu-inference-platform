@@ -285,7 +285,15 @@ resource "kubernetes_deployment_v1" "inference_worker" {
 
           env {
             name  = "MODEL_PATH"
-            value = "yolo.pt"
+            value = "yolo11x.pt"
+          }
+          env {
+            name  = "IMG_SIZE"
+            value = "1280"
+          }
+          env {
+            name  = "BATCH_SIZE"
+            value = "8"
           }
           env {
             name  = "MODEL_BUCKET"
@@ -338,7 +346,7 @@ resource "kubernetes_manifest" "inference_worker_scaled_object" {
       scaleTargetRef = { name = local.inference_worker_base_k8s_name }
 
       minReplicaCount = 0
-      maxReplicaCount = 20
+      maxReplicaCount = 10
 
       pollingInterval = 60
       cooldownPeriod  = 180

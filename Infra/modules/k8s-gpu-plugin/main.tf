@@ -54,3 +54,27 @@ resource "kubernetes_config_map_v1" "nvidia_device_plugin" {
     })
   }
 }
+
+resource "helm_release" "dcgm" {
+  name             = "dcgm-exporter"
+  repository       = "https://nvidia.github.io/dcgm-exporter/helm-charts"
+  chart            = "dcgm-exporter"
+  version          = "4.8.4"
+  namespace        = var.namespace
+  create_namespace = false
+  cleanup_on_fail  = false
+
+  values = [yamlencode({
+    # Time-slicing makes per-pod GPU series duplicates of the same physical GPU.
+    arguments    = ["--kubernetes=false"]
+    nodeSelector = { "karpenter.sh/nodepool" = "gpu" }
+    tolerations = [{
+      key      = "nvidia.com/gpu"
+      operator = "Exists"
+      effect   = "NoSchedule"
+    }]
+    serviceMonitor = {
+      additionalLabels = { release = "kube-prometheus-stack" }
+    }
+  })]
+}

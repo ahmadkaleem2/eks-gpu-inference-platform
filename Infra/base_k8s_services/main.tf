@@ -42,13 +42,14 @@ module "istio" {
 
 }
 
-# module "k8s-gpu-plugin" {
-#   source = "../modules/k8s-gpu-plugin"
+module "k8s-gpu-plugin" {
+  source = "../modules/k8s-gpu-plugin"
 
-#   depends_on = [
-#     module.karpenter
-#   ]
-# }
+  depends_on = [
+    module.karpenter,
+    module.kube_prom_stack
+  ]
+}
 
 module "github_actions_access" {
   source = "../modules/eks_access_entry"

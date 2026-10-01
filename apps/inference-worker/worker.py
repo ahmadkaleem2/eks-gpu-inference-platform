@@ -34,6 +34,9 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 LOCAL_MODEL_PATH = "/tmp/model.pt"
 
+# Inference config
+IMG_SIZE = int(os.getenv("IMG_SIZE", "1280"))
+
 # Batching config
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "8"))
 BATCH_TIMEOUT_SECONDS = int(os.getenv("BATCH_TIMEOUT_SECONDS", "10"))
@@ -356,58 +359,31 @@ def process_batch(messages, model):
     # Batched GPU inference
     # --------------------------------------------------
 
-    try:
-        sources = [item["local_path"] for item in items]
+    sources = [item["local_path"] for item in items]
 
+    # A failed batch is not retried per-image: messages stay undeleted, return
+    # after VisibilityTimeout, and move to the DLQ after maxReceiveCount.
+    try:
+        # Without batch=, Ultralytics runs a list of sources one image at a time.
         results = model.predict(
             source=sources,
             device=0,
+            imgsz=IMG_SIZE,
+            batch=len(sources),
             verbose=False,
         )
-
     except Exception:
-        # If the batched call itself fails (e.g. one corrupt image
-        # crashes the whole forward pass), fall back to processing
-        # each image individually so a single bad image doesn't
-        # take the rest of the batch down with it.
-        logger.exception(
-            "Batched inference failed, falling back to per-image processing"
-        )
-        results = None
-
-    if results is None:
-
         for item in items:
+            cleanup(item["local_path"])
+        raise
 
-            try:
-                single_result = model.predict(
-                    source=item["local_path"],
-                    device=0,
-                    verbose=False,
-                )
-                detections = extract_detections(single_result[0])
-
-                upload_result(item["bucket"], item["key"], detections)
-
-                sqs.delete_message(
-                    QueueUrl=SQS_QUEUE_URL,
-                    ReceiptHandle=item["message"]["ReceiptHandle"],
-                )
-
-            except Exception:
-                logger.exception(
-                    "Processing failed for s3://%s/%s. Message will be retried.",
-                    item["bucket"],
-                    item["key"],
-                )
-
-            finally:
-                cleanup(item["local_path"])
-
-        return
+    logger.info(
+        "GPU memory peak reserved: %d MiB",
+        torch.cuda.max_memory_reserved() // (1024 * 1024),
+    )
 
     # --------------------------------------------------
-    # Batched path succeeded - process each result
+    # Process each result
     # --------------------------------------------------
 
     for item, result in zip(items, results):
@@ -463,9 +439,10 @@ def cleanup(local_path):
 def worker_loop(model):
 
     logger.info(
-        "GPU worker started (batch_size=%d, batch_timeout=%ds)",
+        "GPU worker started (batch_size=%d, batch_timeout=%ds, imgsz=%d)",
         BATCH_SIZE,
         BATCH_TIMEOUT_SECONDS,
+        IMG_SIZE,
     )
 
     while True:

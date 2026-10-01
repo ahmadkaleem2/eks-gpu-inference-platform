@@ -34,6 +34,7 @@ create_infra() {
   # terraform apply -auto-approve
   
   echo "argocd admin password: $(kubectl -n argocd get secret argocd-initial-admin-secret -o=jsonpath='{.data.password}' | base64 -d)"
+  echo "grafana admin password: $(kubectl -n kube-prom-stack get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d)"
   echo "Infrastructure creation complete."
 }
 

@@ -26,6 +26,10 @@ alertmanager:
 #           - matchExpressions:
 #             - key: karpenter.sh/nodepool
 #               operator: DoesNotExist
+
+
+
+
 grafana:
   affinity:
     nodeAffinity:
@@ -34,3 +38,34 @@ grafana:
         - matchExpressions:
           - key: karpenter.sh/nodepool
             operator: DoesNotExist
+
+  sidecar:
+    dashboards:
+      searchNamespace: ALL
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          folder: Custom
+          type: file
+          disableDeletion: false
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  dashboards:
+    default:
+      nvidia-dcgm:
+        gnetId: 12239
+        revision: 2
+        datasource: Prometheus
+
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
